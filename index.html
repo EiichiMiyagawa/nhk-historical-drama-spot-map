@@ -1,0 +1,144 @@
+<!DOCTYPE html><html lang="ja"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width">
+  <title>NHK大河ドラマ関連スポットマップ</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/ol@v7.1.0/ol.css">
+  <script src="https://cdn.jsdelivr.net/npm/ol@v7.1.0/dist/ol.js"></script>
+</head>
+<body>
+  <h1 id=title></h1>
+  <span>
+    <select id="taiga-select"></select>
+    <span id="spot-count"></span>件
+  </span>
+  <div id="olmap" style="width:auto;height:600px;"></div>
+  <div id="popup" class="ol-popup">
+    <div id="popup-content"></div>
+  </div>
+  <div id="test"></div>
+  <hr />
+  <p>DATA: <a href="https://code4fukui.github.io/fukui-spot/fuku-e-spot.csv" target="_blank">福井県公式観光サイト ふくいドットコム スポット</a></p>
+  <p><a href="https://ja.wikipedia.org/wiki/%E3%83%A1%E3%82%A4%E3%83%B3%E3%83%9A%E3%83%BC%E3%82%B8" target="_blank">ウィキペディア</a></p>
+  <p>src: <a href="https://github.com/EiichiMiyagawa/nhk-historical-drama-spot-map" target="_blank">https://github.com/EiichiMiyagawa/nhk-historical-drama-spot-map</a></p>
+  <p><a target="_blank" href="https://icons8.com/icon/OBmVbH2qOGwK/%E3%83%9E%E3%83%BC%E3%82%AB%E3%83%BC">マーカー</a> icon by <a target="_blank" href="https://icons8.com">Icons8</a></p>
+  
+  <script type="module">
+    import { OLMap } from "https://eiichimiyagawa.github.io/OLMap/v1/OLMap.js";
+    import { CSV } from "https://js.sabae.cc/CSV.js";
+    
+    addEventListener("load", async () => {
+      title.textContent = document.title;
+      
+      const data = await CSV.fetch("https://code4fukui.github.io/fukui-spot/fuku-e-spot.csv");
+      const spots = await CSV.toJSON(data);
+      
+      const map = new OLMap({
+        zoom: 9
+      });
+      map.addVectorLayer("marker");
+      const layer = map.getLayer("marker");
+      
+      spots.forEach((spot) => {
+        map.addMarker(layer, {
+          longitude: Number(spot["lng"]),
+          latitude: Number(spot["lat"]),
+          content: `<p><a href="${spot["url"]}" target="_blank">${spot["name"]}</a></p><p>${spot["description"]}</p>`,
+          icon: "./image/icon.png",
+          tag: spot["description"]
+        });
+      });
+      
+      const taigaData = await (await fetch("./taiga.json")).json();
+      const taigaTitles = Object.keys(taigaData).sort((t1, t2) => {
+        if (taigaData[t1]["code"] > taigaData[t2]["code"]) {
+          return 1;
+        }
+        if (taigaData[t1]["code"] < taigaData[t2]["code"]) {
+          return -1;
+        }
+        return 0;
+      });
+      
+      
+      const spotCountElement = document.getElementById("spot-count");
+      const changeShowSpots = (spotName) => {
+        const peoples = taigaData[spotName]["peoples"];
+        let count = 0;
+        layer.getSource().getFeatures().forEach((feature) => {
+          const isShow = peoples.some((people) => {
+            // スポットの解説文に人物名が書かれているかどうかを判定
+            return feature.get("tag").indexOf(people) != -1;
+          });
+          
+          if (isShow) {
+            count++;
+          }
+          
+          const opacity = isShow ? 1.0 : 0.0;
+          feature.getStyle().getImage().setOpacity(opacity);
+        });
+        
+        layer.changed();
+        spotCountElement.textContent = count;
+      };
+      
+      const onChangeTaigaSelect = (event) => {
+        changeShowSpots(event.target.value);  
+      };
+      
+      const taigaSelectElement = document.getElementById("taiga-select");
+      taigaSelectElement.onchange = onChangeTaigaSelect;
+      taigaTitles.forEach((t) => {
+        const option = document.createElement("option");
+        option.textContent = t;
+        taigaSelectElement.append(option);
+      });
+      
+      changeShowSpots(taigaTitles[0]);
+    });
+  </script>
+</body>
+</html>
+
+<style>
+  body {
+    text-align: center;
+    font-family: sans-serif;
+  }
+  
+  textarea {
+    width: 70vw;
+    height: 8em;
+  }
+  
+  .ol-popup {
+    position: absolute;
+    background-color: white;
+    box-shadow: 0 1px 4px rgba(0,0,0,0.2);
+    padding: 15px;
+    border-radius: 10px;
+    border: 1px solid #cccccc;
+    bottom: 12px;
+    left: -50px;
+    min-width: 480px;
+  }
+  .ol-popup:after, .ol-popup:before {
+    top: 100%;
+    border: solid transparent;
+    content: " ";
+    height: 0;
+    width: 0;
+    position: absolute;
+    pointer-events: none;
+  }
+  .ol-popup:after {
+    border-top-color: white;
+    border-width: 10px;
+    left: 48px;
+    margin-left: -10px;
+  }
+  .ol-popup:before {
+    border-top-color: #cccccc;
+    border-width: 11px;
+    left: 48px;
+    margin-left: -11px;
+  }
+</style>
